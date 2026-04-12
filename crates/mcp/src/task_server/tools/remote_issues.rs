@@ -30,13 +30,9 @@ struct McpCreateIssueRequest {
         description = "Optional priority of the issue. Allowed values: 'urgent', 'high', 'medium', 'low'."
     )]
     priority: Option<String>,
-    #[schemars(
-        description = "Optional planned start date. Accepts YYYY-MM-DD or RFC3339."
-    )]
+    #[schemars(description = "Optional planned start date. Accepts YYYY-MM-DD or RFC3339.")]
     start_date: Option<String>,
-    #[schemars(
-        description = "Optional planned target date. Accepts YYYY-MM-DD or RFC3339."
-    )]
+    #[schemars(description = "Optional planned target date. Accepts YYYY-MM-DD or RFC3339.")]
     target_date: Option<String>,
     #[schemars(description = "Optional parent issue ID to create a subissue")]
     parent_issue_id: Option<Uuid>,
@@ -650,7 +646,9 @@ impl McpServer {
         match value {
             None => Ok(None),
             Some(None) => Ok(Some(None)),
-            Some(Some(value)) => Self::parse_issue_datetime(&value, field_name).map(|v| Some(Some(v))),
+            Some(Some(value)) => {
+                Self::parse_issue_datetime(&value, field_name).map(|v| Some(Some(v)))
+            }
         }
     }
 
@@ -992,8 +990,9 @@ impl McpServer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{TimeZone, Utc};
+
+    use super::*;
 
     #[test]
     fn parse_issue_datetime_supports_date_only() {
@@ -1005,13 +1004,13 @@ mod tests {
 
     #[test]
     fn parse_issue_datetime_supports_rfc3339() {
-        let parsed = McpServer::parse_issue_datetime(
-            "2026-04-12T15:30:00+02:00",
-            "target_date",
-        )
-        .expect("RFC3339 input should parse");
+        let parsed = McpServer::parse_issue_datetime("2026-04-12T15:30:00+02:00", "target_date")
+            .expect("RFC3339 input should parse");
 
-        assert_eq!(parsed, Utc.with_ymd_and_hms(2026, 4, 12, 13, 30, 0).unwrap());
+        assert_eq!(
+            parsed,
+            Utc.with_ymd_and_hms(2026, 4, 12, 13, 30, 0).unwrap()
+        );
     }
 
     #[test]
