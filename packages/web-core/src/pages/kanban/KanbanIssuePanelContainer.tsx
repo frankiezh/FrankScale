@@ -40,6 +40,7 @@ import {
   kanbanIssuePanelFormReducer,
   selectDisplayData,
   selectIsCreateDraftDirty,
+  toIssueApiDateTime,
 } from './kanban-issue-panel-state';
 import { useUiPreferencesStore } from '@/shared/stores/useUiPreferencesStore';
 import { useAzureAttachments } from '@/shared/hooks/useAzureAttachments';
@@ -124,6 +125,9 @@ export function KanbanIssuePanelContainer({
   const createComposerInitial = issueComposer?.initial ?? null;
   const kanbanCreateDefaultStatusId = createComposerInitial?.statusId ?? null;
   const kanbanCreateDefaultPriority = createComposerInitial?.priority ?? null;
+  const kanbanCreateDefaultStartDate = createComposerInitial?.startDate ?? null;
+  const kanbanCreateDefaultTargetDate =
+    createComposerInitial?.targetDate ?? null;
   const kanbanCreateDefaultAssigneeIds =
     createComposerInitial?.assigneeIds ?? null;
   const kanbanCreateDefaultParentIssueId =
@@ -153,6 +157,8 @@ export function KanbanIssuePanelContainer({
     (patch: {
       statusId?: string;
       priority?: IssuePriority | null;
+      startDate?: string | null;
+      targetDate?: string | null;
       assigneeIds?: string[];
       parentIssueId?: string;
       title?: string;
@@ -263,6 +269,8 @@ export function KanbanIssuePanelContainer({
       description: null,
       statusId: defaultStatusId,
       priority: kanbanCreateDefaultPriority ?? null,
+      startDate: kanbanCreateDefaultStartDate,
+      targetDate: kanbanCreateDefaultTargetDate,
       assigneeIds: [...(kanbanCreateDefaultAssigneeIds ?? [])],
       tagIds: [],
       createDraftWorkspace: createDraftWorkspaceByDefault,
@@ -270,6 +278,8 @@ export function KanbanIssuePanelContainer({
     [
       defaultStatusId,
       kanbanCreateDefaultPriority,
+      kanbanCreateDefaultStartDate,
+      kanbanCreateDefaultTargetDate,
       kanbanCreateDefaultAssigneeIds,
       createDraftWorkspaceByDefault,
     ]
@@ -592,6 +602,14 @@ export function KanbanIssuePanelContainer({
             composerDraft.priority === undefined
               ? createModeDefaults.priority
               : composerDraft.priority,
+          startDate:
+            composerDraft.startDate === undefined
+              ? createModeDefaults.startDate
+              : composerDraft.startDate,
+          targetDate:
+            composerDraft.targetDate === undefined
+              ? createModeDefaults.targetDate
+              : composerDraft.targetDate,
           assigneeIds:
             composerDraft.assigneeIds ?? createModeDefaults.assigneeIds,
           tagIds: composerDraft.tagIds ?? createModeDefaults.tagIds,
@@ -756,6 +774,14 @@ export function KanbanIssuePanelContainer({
         if (!hasPendingAttachments) {
           debouncedSaveDescription(value as string | null);
         }
+      } else if (field === 'startDate') {
+        updateIssue(selectedKanbanIssueId, {
+          start_date: toIssueApiDateTime(value as string | null),
+        });
+      } else if (field === 'targetDate') {
+        updateIssue(selectedKanbanIssueId, {
+          target_date: toIssueApiDateTime(value as string | null),
+        });
       } else if (field === 'statusId') {
         // Status changes go through the command bar status selection
         openStatusSelection(projectId, [selectedKanbanIssueId]);
@@ -837,8 +863,8 @@ export function KanbanIssuePanelContainer({
           description: displayData.description,
           priority: displayData.priority,
           sort_order: minSortOrder - 1,
-          start_date: null,
-          target_date: null,
+          start_date: toIssueApiDateTime(displayData.startDate),
+          target_date: toIssueApiDateTime(displayData.targetDate),
           completed_at: null,
           parent_issue_id: kanbanCreateDefaultParentIssueId,
           parent_issue_sort_order: null,

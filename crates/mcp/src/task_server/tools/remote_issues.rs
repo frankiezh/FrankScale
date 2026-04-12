@@ -6,6 +6,7 @@ use api_types::{
     ListPullRequestsResponse, ListTagsResponse, MutationResponse, PullRequestStatus,
     SearchIssuesRequest, SortDirection, UpdateIssueRequest,
 };
+use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use rmcp::{
     ErrorData, handler::server::wrapper::Parameters, model::CallToolResult, schemars, tool,
     tool_router,
@@ -29,6 +30,14 @@ struct McpCreateIssueRequest {
         description = "Optional priority of the issue. Allowed values: 'urgent', 'high', 'medium', 'low'."
     )]
     priority: Option<String>,
+    #[schemars(
+        description = "Optional planned start date. Accepts YYYY-MM-DD or RFC3339."
+    )]
+    start_date: Option<String>,
+    #[schemars(
+        description = "Optional planned target date. Accepts YYYY-MM-DD or RFC3339."
+    )]
+    target_date: Option<String>,
     #[schemars(description = "Optional parent issue ID to create a subissue")]
     parent_issue_id: Option<Uuid>,
 }
@@ -213,6 +222,14 @@ struct McpUpdateIssueRequest {
     )]
     priority: Option<String>,
     #[schemars(
+        description = "New planned start date. Accepts YYYY-MM-DD or RFC3339. Pass null to clear."
+    )]
+    start_date: Option<Option<String>>,
+    #[schemars(
+        description = "New planned target date. Accepts YYYY-MM-DD or RFC3339. Pass null to clear."
+    )]
+    target_date: Option<Option<String>>,
+    #[schemars(
         description = "Parent issue ID to set this as a subissue. Pass null to un-nest from parent."
     )]
     parent_issue_id: Option<Option<Uuid>>,
@@ -262,6 +279,8 @@ impl McpServer {
             title,
             description,
             priority,
+            start_date,
+            target_date,
             parent_issue_id,
         }): Parameters<McpCreateIssueRequest>,
     ) -> Result<CallToolResult, ErrorData> {
@@ -287,6 +306,20 @@ impl McpServer {
             },
             None => None,
         };
+        let start_date = match start_date {
+            Some(value) => match Self::parse_issue_datetime(&value, "start_date") {
+                Ok(value) => Some(value),
+                Err(e) => return Ok(McpServer::tool_error(e)),
+            },
+            None => None,
+        };
+        let target_date = match target_date {
+            Some(value) => match Self::parse_issue_datetime(&value, "target_date") {
+                Ok(value) => Some(value),
+                Err(e) => return Ok(McpServer::tool_error(e)),
+            },
+            None => None,
+        };
 
         let payload = CreateIssueRequest {
             id: None,
@@ -295,8 +328,8 @@ impl McpServer {
             title,
             description: expanded_description,
             priority,
-            start_date: None,
-            target_date: None,
+            start_date,
+            target_date,
             completed_at: None,
             sort_order: 0.0,
             parent_issue_id,
@@ -491,6 +524,8 @@ impl McpServer {
             description,
             status,
             priority,
+            start_date,
+            target_date,
             parent_issue_id,
         }): Parameters<McpUpdateIssueRequest>,
     ) -> Result<CallToolResult, ErrorData> {
@@ -528,14 +563,22 @@ impl McpServer {
         } else {
             None
         };
+        let start_date = match Self::parse_optional_issue_datetime(start_date, "start_date") {
+            Ok(value) => value,
+            Err(e) => return Ok(McpServer::tool_error(e)),
+        };
+        let target_date = match Self::parse_optional_issue_datetime(target_date, "target_date") {
+            Ok(value) => value,
+            Err(e) => return Ok(McpServer::tool_error(e)),
+        };
 
         let payload = UpdateIssueRequest {
             status_id,
             title,
             description: expanded_description,
             priority,
-            start_date: None,
-            target_date: None,
+            start_date,
+            target_date,
             completed_at: None,
             sort_order: None,
             parent_issue_id,
@@ -582,6 +625,35 @@ impl McpServer {
 }
 
 impl McpServer {
+    fn parse_issue_datetime(value: &str, field_name: &str) -> Result<DateTime<Utc>, ToolError> {
+        if let Ok(date) = NaiveDate::parse_from_str(value, "%Y-%m-%d") {
+            let naive = date.and_hms_opt(0, 0, 0).ok_or_else(|| {
+                ToolError::message(format!("Invalid {} value '{}'", field_name, value))
+            })?;
+            return Ok(Utc.from_utc_datetime(&naive));
+        }
+
+        DateTime::parse_from_rfc3339(value)
+            .map(|parsed| parsed.with_timezone(&Utc))
+            .map_err(|_| {
+                ToolError::message(format!(
+                    "Invalid {} '{}'. Expected YYYY-MM-DD or RFC3339.",
+                    field_name, value
+                ))
+            })
+    }
+
+    fn parse_optional_issue_datetime(
+        value: Option<Option<String>>,
+        field_name: &str,
+    ) -> Result<Option<Option<DateTime<Utc>>>, ToolError> {
+        match value {
+            None => Ok(None),
+            Some(None) => Ok(Some(None)),
+            Some(Some(value)) => Self::parse_issue_datetime(&value, field_name).map(|v| Some(Some(v))),
+        }
+    }
+
     fn parse_issue_sort_field(sort_field: Option<&str>) -> Result<IssueSortField, ToolError> {
         match sort_field
             .unwrap_or("sort_order")
@@ -921,6 +993,34 @@ impl McpServer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{TimeZone, Utc};
+
+    #[test]
+    fn parse_issue_datetime_supports_date_only() {
+        let parsed = McpServer::parse_issue_datetime("2026-04-12", "start_date")
+            .expect("date-only input should parse");
+
+        assert_eq!(parsed, Utc.with_ymd_and_hms(2026, 4, 12, 0, 0, 0).unwrap());
+    }
+
+    #[test]
+    fn parse_issue_datetime_supports_rfc3339() {
+        let parsed = McpServer::parse_issue_datetime(
+            "2026-04-12T15:30:00+02:00",
+            "target_date",
+        )
+        .expect("RFC3339 input should parse");
+
+        assert_eq!(parsed, Utc.with_ymd_and_hms(2026, 4, 12, 13, 30, 0).unwrap());
+    }
+
+    #[test]
+    fn parse_optional_issue_datetime_supports_clear_patch() {
+        let parsed = McpServer::parse_optional_issue_datetime(Some(None), "target_date")
+            .expect("null patch should be accepted");
+
+        assert_eq!(parsed, Some(None));
+    }
 
     #[test]
     fn collects_all_matching_status_ids_case_insensitively() {

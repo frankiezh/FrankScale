@@ -24,6 +24,8 @@ const priorityLabels: Record<PriorityLevel, string> = {
 export interface IssuePropertyRowProps {
   statusId: string;
   priority: PriorityLevel | null;
+  startDate: string | null;
+  targetDate: string | null;
   assigneeIds: string[];
   assigneeUsers?: KanbanAssigneeUser[];
   statuses: IssuePropertyStatus[];
@@ -33,6 +35,8 @@ export interface IssuePropertyRowProps {
   onRemoveParentIssue?: () => void;
   onStatusClick: () => void;
   onPriorityClick: () => void;
+  onStartDateChange: (value: string | null) => void;
+  onTargetDateChange: (value: string | null) => void;
   onAssigneeClick: () => void;
   onAddClick?: () => void;
   disabled?: boolean;
@@ -42,6 +46,8 @@ export interface IssuePropertyRowProps {
 export function IssuePropertyRow({
   statusId,
   priority,
+  startDate,
+  targetDate,
   assigneeUsers,
   statuses,
   creatorUser,
@@ -50,12 +56,31 @@ export function IssuePropertyRow({
   onRemoveParentIssue,
   onStatusClick,
   onPriorityClick,
+  onStartDateChange,
+  onTargetDateChange,
   onAssigneeClick,
   onAddClick,
   disabled,
   className,
 }: IssuePropertyRowProps) {
   const { t } = useTranslation('common');
+
+  const renderDateField = (
+    label: string,
+    value: string | null,
+    onChange: (nextValue: string | null) => void
+  ) => (
+    <label className="flex items-center gap-half px-base py-half bg-panel rounded-sm text-sm whitespace-nowrap">
+      <span className="text-low">{label}</span>
+      <input
+        type="date"
+        value={value ?? ''}
+        onChange={(event) => onChange(event.target.value || null)}
+        disabled={disabled}
+        className="min-w-[9.5rem] bg-transparent text-normal outline-none disabled:opacity-50"
+      />
+    </label>
+  );
 
   return (
     <div className={cn('flex items-center gap-half flex-wrap', className)}>
@@ -93,6 +118,18 @@ export function IssuePropertyRow({
           </>
         )}
       </PrimaryButton>
+
+      {renderDateField(
+        t('kanban.startDate', 'Start date'),
+        startDate,
+        onStartDateChange
+      )}
+
+      {renderDateField(
+        t('kanban.targetDate', 'Target date'),
+        targetDate,
+        onTargetDateChange
+      )}
 
       {creatorUser &&
         (creatorUser.first_name?.trim() || creatorUser.username?.trim()) && (

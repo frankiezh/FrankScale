@@ -23,6 +23,33 @@ interface SelectedIssueSnapshot {
   description: string | null;
   status_id: string;
   priority: IssuePriority | null;
+  start_date: string | null;
+  target_date: string | null;
+}
+
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+export function formatIssueCalendarDate(
+  value: string | null | undefined
+): string | null {
+  if (!value) return null;
+  if (DATE_ONLY_PATTERN.test(value)) return value;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function toIssueApiDateTime(value: string | null): string | null {
+  if (!value) return null;
+  if (DATE_ONLY_PATTERN.test(value)) return `${value}T00:00:00Z`;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 type KanbanIssuePanelFormAction =
@@ -63,6 +90,8 @@ export function createBlankCreateFormData(
     description: null,
     statusId: defaultStatusId,
     priority: null,
+    startDate: null,
+    targetDate: null,
     assigneeIds: [],
     tagIds: [],
     createDraftWorkspace: createDraftWorkspaceByDefault,
@@ -186,6 +215,8 @@ export function selectDisplayData({
       : (selectedIssue?.description ?? null),
     statusId: selectedIssue?.status_id ?? '',
     priority: selectedIssue?.priority ?? null,
+    startDate: formatIssueCalendarDate(selectedIssue?.start_date),
+    targetDate: formatIssueCalendarDate(selectedIssue?.target_date),
     assigneeIds: currentAssigneeIds,
     tagIds: currentTagIds,
     createDraftWorkspace: false,
@@ -211,6 +242,8 @@ export function selectIsCreateDraftDirty({
       createModeDefaults.description ||
     state.createFormData.statusId !== createModeDefaults.statusId ||
     state.createFormData.priority !== createModeDefaults.priority ||
+    state.createFormData.startDate !== createModeDefaults.startDate ||
+    state.createFormData.targetDate !== createModeDefaults.targetDate ||
     !areStringSetsEqual(
       state.createFormData.assigneeIds,
       createModeDefaults.assigneeIds
