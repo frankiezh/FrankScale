@@ -55,6 +55,8 @@ export interface IssueFormData {
   description: string | null;
   statusId: string;
   priority: IssuePriority | null;
+  startDate: string | null;
+  targetDate: string | null;
   assigneeIds: string[];
   tagIds: string[];
   createDraftWorkspace: boolean;
@@ -302,6 +304,8 @@ export function KanbanIssuePanel({
           <IssuePropertyRow
             statusId={formData.statusId}
             priority={formData.priority}
+            startDate={formData.startDate}
+            targetDate={formData.targetDate}
             assigneeIds={formData.assigneeIds}
             assigneeUsers={assigneeUsers}
             statuses={statuses}
@@ -311,6 +315,8 @@ export function KanbanIssuePanel({
             onRemoveParentIssue={onRemoveParentIssue}
             onStatusClick={() => onFormChange('statusId', formData.statusId)}
             onPriorityClick={() => onFormChange('priority', formData.priority)}
+            onStartDateChange={(value) => onFormChange('startDate', value)}
+            onTargetDateChange={(value) => onFormChange('targetDate', value)}
             onAssigneeClick={() =>
               onFormChange('assigneeIds', formData.assigneeIds)
             }
